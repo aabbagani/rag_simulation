@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RAG Simulator</title>
+<style>
+
+*{
+box-sizing:border-box;
+font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+}
+
+body{
+margin:0;
+background:linear-gradient(135deg,#0f172a,#1e293b);
+color:white;
+padding:40px;
+}
+
+h1{
+font-weight:700;
+letter-spacing:-0.02em;
+}
+
+.container{
+max-width:1200px;
+margin:auto;
+}
+
+.card{
+background:rgba(255,255,255,0.05);
+backdrop-filter:blur(10px);
+border-radius:14px;
+padding:20px;
+margin-bottom:20px;
+border:1px solid rgba(255,255,255,0.1);
+}
+
+textarea{
+width:100%;
+height:100px;
+background:#0f172a;
+border:1px solid rgba(255,255,255,0.2);
+border-radius:8px;
+padding:10px;
+color:white;
+}
+
+input{
+width:100%;
+padding:10px;
+background:#0f172a;
+border:1px solid rgba(255,255,255,0.2);
+border-radius:8px;
+color:white;
+}
+
+button{
+padding:10px 16px;
+border:none;
+border-radius:8px;
+background:#6366f1;
+color:white;
+font-weight:600;
+cursor:pointer;
+margin-top:10px;
+}
+
+button:hover{
+background:#4f46e5;
+}
+
+.grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:20px;
+}
+
+.chunk{
+background:#1e293b;
+padding:10px;
+border-radius:8px;
+margin-top:6px;
+font-size:14px;
+}
+
+.vector{
+font-family:monospace;
+font-size:12px;
+color:#a5b4fc;
+}
+
+.result{
+background:#020617;
+border-radius:8px;
+padding:12px;
+margin-top:10px;
+}
+
+.step{
+margin-top:12px;
+padding:10px;
+background:#0f172a;
+border-left:4px solid #6366f1;
+border-radius:6px;
+font-size:14px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>RAG Simulator</h1>
+<p>Interactive demo showing how Retrieval-Augmented Generation works.</p>
+
+<div class="grid">
+
+<div class="card">
+<h3>1️⃣ External Knowledge (Documents)</h3>
+
+<textarea id="docs">
+Paris is the capital of France.
+Berlin is the capital of Germany.
+Tokyo is the capital of Japan.
+France is known for the Eiffel Tower.
+</textarea>
+
+<button onclick="chunkDocs()">Chunk Documents</button>
+
+<div id="chunks"></div>
+</div>
+
+
+<div class="card">
+<h3>2️⃣ Ask a Question</h3>
+
+<input id="query" placeholder="Example: What is the capital of France?">
+
+<button onclick="runRAG()">Run RAG Retrieval</button>
+
+<div id="retrieval"></div>
+
+</div>
+
+</div>
+
+<div class="card">
+<h3>Pipeline Visualization</h3>
+<div id="pipeline"></div>
+</div>
+
+</div>
+
+
+<script>
+
+let chunks = []
+let vectors = []
+
+function embed(text){
+
+let vec=[0,0,0,0]
+
+text=text.toLowerCase()
+
+if(text.includes("france")) vec[0]+=1
+if(text.includes("germany")) vec[1]+=1
+if(text.includes("japan")) vec[2]+=1
+if(text.includes("capital")) vec[3]+=1
+
+return vec
+
+}
+
+function similarity(a,b){
+
+let dot=0
+let magA=0
+let magB=0
+
+for(let i=0;i<a.length;i++){
+dot+=a[i]*b[i]
+magA+=a[i]*a[i]
+magB+=b[i]*b[i]
+}
+
+magA=Math.sqrt(magA)
+magB=Math.sqrt(magB)
+
+return dot/(magA*magB+0.0001)
+
+}
+
+function chunkDocs(){
+
+let docText=document.getElementById("docs").value
+
+chunks=docText.split(".").map(s=>s.trim()).filter(Boolean)
+
+vectors=chunks.map(c=>embed(c))
+
+let html="<h4>Chunks + Embeddings</h4>"
+
+chunks.forEach((c,i)=>{
+
+html+=`
+<div class="chunk">
+${c}
+<div class="vector">embedding: [${vectors[i]}]</div>
+</div>
+`
+
+})
+
+document.getElementById("chunks").innerHTML=html
+
+}
+
+function runRAG(){
+
+let q=document.getElementById("query").value
+
+let qVec=embed(q)
+
+let scores=chunks.map((c,i)=>{
+
+return{
+chunk:c,
+score:similarity(qVec,vectors[i])
+}
+
+})
+
+scores.sort((a,b)=>b.score-a.score)
+
+let top=scores.slice(0,2)
+
+let retrievalHTML="<h4>Retrieved Chunks</h4>"
+
+top.forEach(r=>{
+retrievalHTML+=`
+<div class="result">
+${r.chunk}<br>
+score: ${r.score.toFixed(2)}
+</div>
+`
+})
+
+document.getElementById("retrieval").innerHTML=retrievalHTML
+
+
+let context=top.map(t=>t.chunk).join(" ")
+
+let answer="Simulated LLM Answer: Based on retrieved context → "+context
+
+document.getElementById("pipeline").innerHTML=`
+
+<div class="step">User Query → "${q}"</div>
+
+<div class="step">Query Embedding → [${qVec}]</div>
+
+<div class="step">Vector Similarity Search</div>
+
+<div class="step">Retrieved Context → ${context}</div>
+
+<div class="step">Prompt Augmentation → LLM receives context + query</div>
+
+<div class="step"><b>${answer}</b></div>
+
+`
+
+}
+
+</script>
+
+</body>
+</html>
